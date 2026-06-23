@@ -3,7 +3,9 @@ import os
 from services.auth.login_wall import render_login_wall
 from services.state.session_defaults import initial_session_defaults
 from services.config.workout_config import EXERCISE_OPTIONS
-from services.ui.style_loader import load_css, inject_local_font
+from services.ui.style_loader import load_css, inject_local_font, inject_webrtc_styles
+from services.persistent.exercise_repository import init_db
+from streamlit_webrtc import WebRtcMode, webrtc_streamer
 
 def main():
     st.set_page_config(
@@ -14,6 +16,8 @@ def main():
 
     load_css(os.path.join(os.getcwd(), "static", "style.css"))
     inject_local_font(os.path.join(os.getcwd(), "static", "AdobeClean.otf"), "AdobeClean")
+
+    init_db()
 
     if not render_login_wall():
         return
@@ -35,9 +39,9 @@ def main():
         if not workout_started:
             st.selectbox("Exercise", options=EXERCISE_OPTIONS, key="plan_exercise")
 
-            st.number_input("Sets", min_value=0, max_value=50, step=1, key="plan_sets")
+            st.number_input("Sets", min_value=1, max_value=50, step=1, key="plan_sets")
 
-            st.number_input("Reps per Set", min_value=0, max_value=100, step=1, key="plan_reps")
+            st.number_input("Reps per Set", min_value=1, max_value=100, step=1, key="plan_reps")
 
             st.markdown("")
 
@@ -109,9 +113,47 @@ def main():
                 st.metric("Shoulder Status", st.session_state.get("shoulder_status"))
                 st.metric("Back Arch Status", st.session_state.get("back_arch_status"))
 
-        
+    st.title("💪🏻 AI Real-time Gym Coach")
+    st.markdown("#### Real-time pose detection with proactive AI voice coaching")
 
-            
+    if not workout_started:
+        st.markdown(
+            """
+            <div style="
+                border: 10px dashed #444;
+                border-radius: 0px;
+                padding: 48px 32px;
+                text-align: center;
+                color: #888;
+                margin-top: 32px;
+                margin-bottom: 32px;
+            ">
+                <h2 style="color:#ccc; margin-bottom:8px;">👈 Set your workout plan</h2>
+                <p style="font-size:1.05rem;">
+                    Choose your exercise, sets and reps in the sidebar,<br>
+                    then click <strong>Start Workout</strong> to activate the camera and AI coach.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        context = webrtc_streamer(
+            key="exercise-analysis",
+            mode=WebRtcMode.SENDRECV,
+            video_processor_factory=None,  # Replace with your actual video processor class 
+            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+            media_stream_constraints={
+                "video": True,
+                "audio": False
+            },
+            async_processing=True
+        )
+
+    st.markdown("#### Workout History")
+
+
+    inject_webrtc_styles()
+     
 if __name__ == "__main__":
     main()
-
